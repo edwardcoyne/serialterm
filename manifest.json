@@ -14,7 +14,8 @@
   "permissions": [
     "serial",
     "storage",
-    "fileSystem"
+    "fileSystem",
+    {"fileSystem": ["write"]}
   ],
   "app": {
     "background": {

@@ -22,6 +22,7 @@ var Application = function(argv) {
     this.keyboard_ = null;
     this.connectionId = null;
     this.portInfo_ = null;
+    this.logFile_ = null;
 
     this.PORT_KEY = 'port';
     this.BITRATE_KEY = 'bitrate';
@@ -163,6 +164,9 @@ Application.prototype.run = function() {
         if (info && info.data) {
             self.io.print(ab2str(info.data));
         }
+        if (self.logFile_) {
+            self.logFile_.write(info.data);
+        }
     });
 
     chrome.serial.onReceiveError.addListener(function (e) {
@@ -205,6 +209,50 @@ Application.prototype.run = function() {
         } else {
             Application.prototype.connect.call(self);
         }
+    };
+
+    document.getElementById('log-file-picker').onclick = function() {
+            chrome.fileSystem.chooseEntry(
+                {
+                    type: "saveFile",
+                    suggestedName: "serialterm-log.txt",
+                    acceptsMultiple: false,
+                },
+                function(fileEntry){
+                    if (fileEntry == undefined) {
+                        console.error("Failed to open file.");
+                        return;
+                    }
+                    fileEntry.createWriter(function(file) {
+                        document.getElementById('log-file-picker').innerText = "Logging to: " + fileEntry.name;
+
+                        self.logFile_ = {
+                            file: file,
+                            buffer: [],
+                            processing: false,
+                            write: function(data) {
+                                self.logFile_.buffer.push(data);
+                                self.logFile_.processBuffer();
+                            },
+                            writeNext: function() {
+                                file.write(new Blob([self.logFile_.buffer.shift()]));
+                            },
+                            writeDone: function(e) {
+                                if (self.logFile_.buffer.length == 0) {
+                                    self.logFile_.processing = false;
+                                } else {
+                                    self.logFile_.writeNext();
+                                }
+                            },
+                            processBuffer: function() {
+                                if (self.logFile_.processing) return;
+                                self.logFile_.processing = true;
+                                self.logFile_.writeNext();
+                            }
+                        };
+                        file.onwriteend = self.logFile_.writeDone;
+                    });
+                });
     };
 };
 
